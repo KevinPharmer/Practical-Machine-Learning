@@ -1,0 +1,58 @@
+##Introduction - Practical Machine Learning Course Project
+To practice usage of practical machine learning algorithms, the Weight Lifting Exercise data set from http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. The data was collected from volunteers who performed a bicep curl, 5 different ways, with one designated as the correct way. An algorithm will be applied to the data to determine if the algorithm can correctly predict the correct classification of bicep curl that was performed.  
+
+##Required Packages 
+```{r}
+library(caret)
+library(randomForest)
+
+```
+
+##Reading and Cleaning Data
+Based on visual inspection of the data set, many columns have no data, or have NA. Algorithms are best improved with good data, so incomplete data sets will be excluded. Data that is empty will be made NA to make removal of columns easier. The sum of non-zero containing cells was then added up, to determine which columns had full data. This is then used to subset the values.  
+In addition, the first 6 columns are user names and timestamps, which were exlucded as they likely do not have any predictive value.
+```{r}
+train <- read.csv("pml-training.csv", header = TRUE, na.strings=c(""," ","NA"))##converts blanks to NA for easier removal later
+test <- read.csv("pml-testing.csv", header = TRUE, na.strings=c(""," ","NA"))
+
+num_nonzero <- apply(train, 2, function(c)sum(c!=0))##determines which columns have non-zero values
+nonzero_col <- !is.na(num_nonzero)##the columns without actual data will be NA in num_nonzero
+
+train_subset <- train[ , nonzero_col]##subsets the columns with non_zero data
+train_subset <- train_subset[, -(1:6)]##removes the first 6 columns as they do not appear to have predictive value
+
+##the above is repeated for the test data set
+num_nonzero_test <- apply(test, 2, function(c)sum(c!=0))
+nonzero_col_test <- !is.na(num_nonzero_test)
+
+test_subset <- test[ , nonzero_col_test]
+test_subset <- test_subset[, -(1:6)]
+colnames(test_subset) == colnames(train_subset)##checking if the same columns were subsetted for training/testing
+```
+
+##Partitioning the Data
+The training data will be partitioned to use for validation prior to the prediction for the test set
+```{r}
+set.seed(88)
+inTraining <- createDataPartition(train_subset$classe, p = 0.75, list = FALSE)
+training <- train_subset[inTraining, ]
+testing <- train_subset[-inTraining, ]
+```
+
+##Modeling and cross validation
+A random forest model was first attempted. This was chosen because there are many potential predictors, and it is unlikely all of them will be that useful. If multi-linear regression was chosen, more interpretation of potential interaction would be required among variables. The model was trained using the Caret package train function with mostly default settings. The default includes boot strapping, which was viewed as a positive in this case since it considers multiple trees. The cons is that the computation is a bit slow, but for a course project this was deemed acceptable.  
+
+confusionMatrix was used to evaluate the accurarcy of the model, which was 99.86%. No further models were explored given the high accuracy. 
+```{r}
+rf_model <- train(classe ~ ., method = "rf", data = training, number = 10)
+pred_rf <- predict(rf_model, testing)
+
+confusionMatrix(pred_rf, testing$classe)$overall
+```
+##Prediction on the Test Set
+The random forest model was used to predict the classe of 20 test cases. The output is shown below and matches the correct values from the course quiz.  
+```{r}
+predictions <- predict(rf_model, test_subset)
+predictions
+```
+
